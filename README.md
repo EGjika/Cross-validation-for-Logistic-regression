@@ -14,3 +14,5 @@ Visualize how k impacts model accuracy through a dynamic plot.
 This tool is perfect for understanding how cross-validation works and its role in improving model reliability. 
 
 Give it a try and enhance your logistic regression workflows! 🚀
+
+Note: the error shows becaus eyour target variable is not in the format 0/1 (in my data sample it is Y/N)
