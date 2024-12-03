@@ -1,0 +1,397 @@
+---
+title: "Cross validation- UMT"
+author: "Eralda Gjika"
+output: html_notebook
+---
+
+# Example: K-Fold Cross-Validation in R
+
+```{r}
+# Load necessary libraries
+library(caret)
+
+# Simulate some example data
+set.seed(123)
+n <- 100
+df <- data.frame(
+  x1 = rnorm(n),
+  x2 = rnorm(n),
+  y = rnorm(n)
+)
+
+# Define train control with k-fold cross-validation
+train_control <- trainControl(
+  method = "cv",       # Cross-validation
+  number = 5           # Number of folds
+)
+
+# Train a linear regression model
+set.seed(123)
+model <- train(
+  y ~ x1 + x2,         # Formula
+  data = df,           # Dataset
+  method = "lm",       # Linear model
+  trControl = train_control # Train control settings
+)
+
+# View model results
+print(model)
+
+```
+
+```{r}
+# Simulate new data
+new_data <- data.frame(
+  x1 = rnorm(10),   # 10 new samples
+  x2 = rnorm(10)
+)
+
+# Use the trained model to predict
+predictions <- predict(model, new_data)
+
+# Print predictions
+print(predictions)
+
+```
+
+
+# Example: Leave-One-Out Cross-Validation (LOOCV)
+
+```{r}
+# LOOCV settings
+train_control_loocv <- trainControl(
+  method = "LOOCV"     # Leave-One-Out Cross-Validation
+)
+
+# Train a linear regression model with LOOCV
+set.seed(123)
+model_loocv <- train(
+  y ~ x1 + x2,
+  data = df,
+  method = "lm",
+  trControl = train_control_loocv
+)
+
+# View model results
+print(model_loocv)
+
+```
+
+```{r}
+# Predict using the model trained with LOOCV
+predictions_loocv <- predict(model_loocv, new_data)
+
+# Print predictions
+print(predictions_loocv)
+
+```
+
+
+# Example: Stratified K-Fold Cross-Validation for Classification
+
+```{r}
+# Simulate classification data
+set.seed(123)
+df_class <- data.frame(
+  x1 = rnorm(n),
+  x2 = rnorm(n),
+  y = factor(sample(c("A", "B"), n, replace = TRUE))
+)
+
+library(MLmetrics)
+# Define stratified k-fold cross-validation
+train_control_stratified <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,    # Enables probability estimates
+  summaryFunction = multiClassSummary # Multi-class metrics
+)
+
+# Train a logistic regression model
+set.seed(123)
+model_class <- train(
+  y ~ x1 + x2,
+  data = df_class,
+  method = "glm",
+  family = binomial,
+  trControl = train_control_stratified
+)
+
+# View model results
+print(model_class)
+
+```
+```{r}
+# Predict probabilities
+probabilities <- predict(model_class, new_data, type = "prob")
+
+# Predict classes
+predicted_classes <- predict(model_class, new_data, type = "raw")
+
+# Combine results
+results <- data.frame(
+  new_data,
+  Predicted_Class = predicted_classes,
+  Prob_A = probabilities[, "A"],  # Probability of class "A"
+  Prob_B = probabilities[, "B"]   # Probability of class "B"
+)
+
+# Print predictions
+print(results)
+
+```
+
+```{r}
+# For regression
+plot(new_data$x1, predictions, col = "blue", pch = 16, main = "Predictions")
+# For classification
+table(Predicted = predicted_classes)
+
+
+```
+
+
+To compare the accuracy of models trained using **k-fold cross-validation** and **LOOCV**, you can calculate performance metrics (e.g., RMSE, accuracy, etc.) for each method and directly compare the results.
+
+
+### Example Workflow
+
+#### 1. Setup the Data
+Simulate a dataset to use for comparison.
+
+```{r}
+# Load libraries
+library(caret)
+
+# Simulate data
+set.seed(123)
+data <- data.frame(
+  x1 = rnorm(100),
+  x2 = rnorm(100),
+  y = rnorm(100)  # For regression
+)
+```
+
+
+#### 2. Define the Model and Training Parameters
+Specify the model type and train control for k-fold and LOOCV.
+
+```{r}
+# k-Fold Cross-Validation (e.g., 5 folds)
+control_kfold <- trainControl(
+  method = "cv", 
+  number = 5,   # Number of folds
+  savePredictions = "final"
+)
+
+# Leave-One-Out Cross-Validation (LOOCV)
+control_loocv <- trainControl(
+  method = "LOOCV", 
+  savePredictions = "final"
+)
+
+# Train models using caret
+set.seed(123)
+model_kfold <- train(
+  y ~ ., 
+  data = data, 
+  method = "lm",  # Linear regression
+  trControl = control_kfold
+)
+
+set.seed(123)
+model_loocv <- train(
+  y ~ ., 
+  data = data, 
+  method = "lm", 
+  trControl = control_loocv
+)
+```
+
+
+#### 3. Extract Accuracy
+Caret provides metrics like RMSE (for regression) or Accuracy (for classification) by default.
+```{r}
+# Extract RMSE for k-Fold
+kfold_rmse <- model_kfold$results$RMSE
+cat("k-Fold RMSE:", kfold_rmse, "\n")
+
+# Extract RMSE for LOOCV
+loocv_rmse <- model_loocv$results$RMSE
+cat("LOOCV RMSE:", loocv_rmse, "\n")
+```
+
+For **classification**, use `Accuracy` instead of `RMSE`.
+
+
+
+#### 4. Compare Performance
+Create a summary to directly compare the two methods.
+
+```{r}
+comparison <- data.frame(
+  Method = c("k-Fold CV", "LOOCV"),
+  RMSE = c(kfold_rmse, loocv_rmse)
+)
+
+print(comparison)
+```
+
+
+#### 5. Visualize Comparison
+You can use a bar plot to visualize the performance metrics.
+
+```{r}
+library(ggplot2)
+
+ggplot(comparison, aes(x = Method, y = RMSE, fill = Method)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  theme_minimal() +
+  labs(
+    title = "Comparison of Cross-Validation Methods",
+    y = "RMSE",
+    x = "Validation Method"
+  )
+```
+
+
+
+```{r}
+# Load required libraries
+library(caret)
+library(ggplot2)
+library(dplyr)
+
+# Simulate data
+set.seed(123)
+data <- data.frame(
+  x1 = rnorm(100),
+  x2 = rnorm(100),
+  y = rnorm(100)  # For regression
+)
+
+# Define train controls for k-Fold and LOOCV
+control_kfold <- trainControl(method = "cv", number = 5, savePredictions = "final")
+control_loocv <- trainControl(method = "LOOCV", savePredictions = "final")
+
+# Train models
+set.seed(123)
+model_kfold <- train(y ~ ., data = data, method = "lm", trControl = control_kfold)
+
+set.seed(123)
+model_loocv <- train(y ~ ., data = data, method = "lm", trControl = control_loocv)
+
+# Extract metrics
+metrics <- data.frame(
+  Method = c("k-Fold CV", "LOOCV"),
+  RMSE = c(model_kfold$results$RMSE, model_loocv$results$RMSE),
+  MAE = c(model_kfold$results$MAE, model_loocv$results$MAE),
+  R2 = c(model_kfold$results$Rsquared, model_loocv$results$Rsquared)
+)
+
+# Print comparison table
+print(metrics)
+
+# Convert metrics to long format for plotting
+metrics_long <- metrics %>%
+  pivot_longer(cols = -Method, names_to = "Metric", values_to = "Value")
+
+# Plot comparison of metrics
+ggplot(metrics_long, aes(x = Metric, y = Value, fill = Method)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.6) +
+  theme_minimal() +
+  labs(
+    title = "Comparison of Accuracy Metrics",
+    x = "Metric",
+    y = "Value"
+  ) +
+  scale_fill_manual(values = c("k-Fold CV" = "steelblue", "LOOCV" = "orange"))
+
+```
+
+
+### Key Notes:
+1. **Run the same model** with the same data across both k-fold and LOOCV to ensure a fair comparison.
+2. **LOOCV is computationally expensive** but might provide more reliable results for small datasets.
+3. If you're using **classification**, replace `RMSE` with `Accuracy`, `Sensitivity`, or other classification metrics depending on your goal.
+
+
+
+
+
+
+#### Rolling Window Cross-Validation
+We use a rolling forecast origin where the training set is fixed in size, and the test set is a single step ahead.
+
+
+```{r}
+# Cross-validation function
+rolling_cv <- function(ts_data, initial_window, horizon) {
+  n <- length(ts_data)
+  errors <- numeric() # Store forecast errors
+  
+  for (i in seq(initial_window, n - horizon)) {
+    # Training and test sets
+    train <- ts_data[1:i]
+    test <- ts_data[(i + 1):(i + horizon)]
+    
+    # Fit ARIMA model on the training set
+    model <- auto.arima(train)
+    
+    # Forecast for the test set
+    forecast <- forecast(model, h = horizon)
+    
+    # Calculate forecast error (e.g., RMSE)
+    error <- sqrt(mean((forecast$mean - test)^2))
+    errors <- c(errors, error)
+  }
+  
+  # Return the errors
+  return(errors)
+}
+
+# Perform rolling window CV
+set.seed(123)
+cv_errors <- rolling_cv(ts_data, initial_window = 60, horizon = 1)
+
+# Summary of errors
+mean(cv_errors)  # Average RMSE
+```
+
+
+#### Expanding Window Cross-Validation
+Similar to rolling but with an expanding training set.
+
+```{r}
+expanding_cv <- function(ts_data, horizon) {
+  n <- length(ts_data)
+  errors <- numeric()
+for (i in seq(1, n - horizon)) {
+    # Training and test sets
+    train <- ts_data[1:i]
+    test <- ts_data[(i + 1):(i + horizon)]
+    
+    # Fit ARIMA model on the training set
+    model <- auto.arima(train)
+    
+    # Forecast for the test set
+    forecast <- forecast(model, h = horizon)
+    
+    # Calculate forecast error (e.g., RMSE)
+    error <- sqrt(mean((forecast$mean - test)^2))
+    errors <- c(errors, error)
+  }
+  
+  # Return the errors
+  return(errors)
+}
+
+# Perform expanding window CV
+set.seed(123)
+expanding_errors <- expanding_cv(ts_data, horizon = 1)
+
+# Summary of errors
+mean(expanding_errors)  # Average RMSE
+```
+
+
